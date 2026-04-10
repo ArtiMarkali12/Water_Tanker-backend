@@ -1,6 +1,5 @@
 "use strict";
 
-const mongoose = require("mongoose");
 const Request = require("../models/request.model");
 const { REQUEST_STATUS } = require("../config/constants");
 
@@ -85,9 +84,12 @@ const completeRequest = async (requestId) => {
 /**
  * Generates a manager report with assignment statistics and history.
  * Supports optional date range filtering.
+ *
+ * NOTE: All managers should see the SAME complete data since they have
+ * the same access level. This report shows ALL requests in the system,
+ * not just requests assigned by a specific manager.
  */
 const getManagerReport = async ({
-  managerId,
   startDate,
   endDate,
   page = 1,
@@ -95,18 +97,18 @@ const getManagerReport = async ({
 } = {}) => {
   const skip = (page - 1) * limit;
 
-  // Build match conditions
-  const matchConditions = {
-    assignedBy: new mongoose.Types.ObjectId(managerId),
-  };
+  // Build match conditions - filter by date range if provided, but NOT by manager
+  const matchConditions = {};
 
+  // If date range is provided, filter by createdAt (when the request was created)
+  // This gives a complete picture of all requests in that time period
   if (startDate || endDate) {
-    matchConditions.assignedAt = {};
-    if (startDate) matchConditions.assignedAt.$gte = new Date(startDate);
-    if (endDate) matchConditions.assignedAt.$lte = new Date(endDate);
+    matchConditions.createdAt = {};
+    if (startDate) matchConditions.createdAt.$gte = new Date(startDate);
+    if (endDate) matchConditions.createdAt.$lte = new Date(endDate);
   }
 
-  // Get summary statistics
+  // Get summary statistics - count ALL requests by status
   const stats = await Request.aggregate([
     { $match: matchConditions },
     {
@@ -117,35 +119,44 @@ const getManagerReport = async ({
     },
   ]);
 
-  // Get total assigned requests
-  const totalAssigned = await Request.countDocuments(matchConditions);
+  // Get total requests
+  const totalRequests = await Request.countDocuments(matchConditions);
 
-  // Get detailed assignment history with pagination
-  const assignments = await Request.find(matchConditions)
-    .sort({ assignedAt: -1 })
+  // Get all requests with full details and pagination
+  const requests = await Request.find(matchConditions)
+    .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limit)
     .populate("userId", "mobileNumber profile")
     .populate("assignedBy", "username mobileNumber")
     .lean();
 
-  // Format statistics
+  // Format statistics - ensure all status types are present
   const summary = {
-    total: totalAssigned,
+    total: totalRequests,
+    pending: 0,
+    assigned: 0,
+    completed: 0,
+    cancelled: 0,
     byStatus: stats.reduce((acc, stat) => {
       acc[stat._id] = stat.count;
       return acc;
     }, {}),
   };
 
+  // Fill in explicit counts for each status
+  stats.forEach((stat) => {
+    summary[stat._id] = stat.count;
+  });
+
   return {
     summary,
-    assignments,
+    requests,
     pagination: {
       page,
       limit,
-      total: totalAssigned,
-      totalPages: Math.ceil(totalAssigned / limit),
+      total: totalRequests,
+      totalPages: Math.ceil(totalRequests / limit),
     },
   };
 };

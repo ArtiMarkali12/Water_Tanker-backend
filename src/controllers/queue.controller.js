@@ -74,7 +74,6 @@ const getManagerReport = async (req, res) => {
   const { startDate, endDate } = req.query;
 
   const report = await queueService.getManagerReport({
-    managerId: req.user._id,
     startDate,
     endDate,
     page,
