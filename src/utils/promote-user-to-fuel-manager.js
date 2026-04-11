@@ -24,7 +24,7 @@ const promoteSpecificUserToFuelManager = async () => {
     const user = await User.findOne({ mobileNumber });
 
     if (!user) {
-      console.log(`❌ No user found with mobile number ${mobileNumber}`);
+      console.log(`❌ No user found with this mobile number ${mobileNumber}`);
       process.exit(1);
     }
 
