@@ -42,7 +42,7 @@ const errorHandler = (err, req, res, _next) => {
   }
 
   if (err.name === 'TokenExpiredError') {
-    return sendError(res, { message: 'Token expired. Please login again.', statusCode: 401 });
+    return sendError(res, { message: 'Token expired. Please login again ', statusCode: 401 });
   }
 
   // Custom application errors
