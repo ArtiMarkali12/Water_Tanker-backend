@@ -13,13 +13,13 @@ const recordDieselFillingValidator = [
     .isISO8601()
     .withMessage("Date time must be a valid ISO 8601 date."),
 
-  body("dieselAmount")
-    .isFloat({ min: 0 })
-    .withMessage("Diesel amount must be a non-negative number."),
-
   body("liters")
     .isFloat({ min: 0 })
     .withMessage("Liters must be a non-negative number."),
+
+  body("kilometersTravelledSinceLastTrip")
+    .isFloat({ min: 0 })
+    .withMessage("Kilometers travelled since last trip must be a non-negative number."),
 ];
 
 const updateDieselFillingValidator = [
@@ -36,15 +36,15 @@ const updateDieselFillingValidator = [
     .isISO8601()
     .withMessage("Date time must be a valid ISO 8601 date."),
 
-  body("dieselAmount")
-    .optional()
-    .isFloat({ min: 0 })
-    .withMessage("Diesel amount must be a non-negative number."),
-
   body("liters")
     .optional()
     .isFloat({ min: 0 })
     .withMessage("Liters must be a non-negative number."),
+
+  body("kilometersTravelledSinceLastTrip")
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage("Kilometers travelled since last trip must be a non-negative number."),
 ];
 
 const getDieselFillingValidator = [

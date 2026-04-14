@@ -1,13 +1,12 @@
 const DieselFilling = require("../models/dieselFilling.model");
 const Request = require("../models/request.model");
-const Receipt = require("../models/receipt.model");
-const AppError = require("../middlewares/error.middleware");
+const { AppError } = require("../middlewares/error.middleware");
 const { logger } = require("../utils/logger.util");
 const { DIESEL_FILLING_STATUS } = require("../config/constants");
 
 /**
- * Calculate the number of trips completed by a tanker between two dates
- * A trip is counted when a request has status 'completed' and has a tankerAssignment
+ * Calculate the number of trips completed by a tanker between two dates.
+ * A trip is counted when a request has status 'completed' and has a tankerAssignment.
  */
 const calculateTripsBetweenDates = async (tankerNumber, startDate, endDate) => {
   const tripCount = await Request.countDocuments({
@@ -18,37 +17,57 @@ const calculateTripsBetweenDates = async (tankerNumber, startDate, endDate) => {
       $lte: endDate,
     },
   });
-
   return tripCount;
 };
 
 /**
- * Get the last diesel filling for a specific tanker
+ * Sum of roundTripKilometer for all completed trips of a tanker in a date range.
+ * Used for the summary API to report total km since last fill.
+ */
+const sumRoundTripKmBetweenDates = async (tankerNumber, startDate, endDate) => {
+  const result = await Request.aggregate([
+    {
+      $match: {
+        "tankerAssignment.tankerNumber": tankerNumber,
+        status: "completed",
+        completedAt: {
+          $gt: startDate || new Date(0),
+          $lte: endDate,
+        },
+        roundTripKilometer: { $ne: null },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        totalKm: { $sum: "$roundTripKilometer" },
+      },
+    },
+  ]);
+  return result[0]?.totalKm || 0;
+};
+
+/**
+ * Get the last diesel filling for a specific tanker.
  */
 const getLastFillingByTanker = async (tankerNumber) => {
   const lastFilling = await DieselFilling.findOne({ tankerNumber })
     .sort({ dateTime: -1 })
     .lean();
-
   return lastFilling;
 };
 
 /**
- * Record a new diesel filling entry
- * This will:
- * 1. Find the last diesel filling for this tanker
- * 2. Calculate trips completed since last filling
- * 3. Create the new diesel filling record
+ * Record a new diesel filling entry.
+ * Calculates trips completed since last filling automatically.
  */
 const recordDieselFilling = async (data, userId) => {
-  const { tankerNumber, dateTime, dieselAmount, liters } = data;
+  const { tankerNumber, dateTime, liters, kilometersTravelledSinceLastTrip } = data;
 
-  // Start a session for transaction
   const session = await DieselFilling.startSession();
   session.startTransaction();
 
   try {
-    // Get the last diesel filling for this tanker
     const lastFilling = await getLastFillingByTanker(tankerNumber);
 
     let tripsSinceLastFill = 0;
@@ -56,13 +75,11 @@ const recordDieselFilling = async (data, userId) => {
 
     if (lastFilling) {
       lastFillingDate = lastFilling.dateTime;
-      // Calculate trips from last filling date to current dateTime
       tripsSinceLastFill = await calculateTripsBetweenDates(
         tankerNumber,
         lastFillingDate,
         dateTime,
       );
-
       logger.info(
         `Tanker ${tankerNumber}: ${tripsSinceLastFill} trips completed since last diesel filling on ${lastFillingDate}`,
       );
@@ -70,14 +87,13 @@ const recordDieselFilling = async (data, userId) => {
       logger.info(`First diesel filling record for tanker ${tankerNumber}`);
     }
 
-    // Create the new diesel filling record
     const newFilling = await DieselFilling.create(
       [
         {
           tankerNumber,
           dateTime,
-          dieselAmount,
           liters,
+          kilometersTravelledSinceLastTrip,
           filledBy: userId,
           tripsSinceLastFill,
           lastFillingDate,
@@ -103,7 +119,7 @@ const recordDieselFilling = async (data, userId) => {
 };
 
 /**
- * Get all diesel fillings with pagination
+ * Get all diesel fillings with pagination.
  */
 const getAllDieselFillings = async (page = 1, limit = 20, filters = {}) => {
   const query = {};
@@ -143,53 +159,40 @@ const getAllDieselFillings = async (page = 1, limit = 20, filters = {}) => {
 };
 
 /**
- * Get diesel filling by ID
+ * Get diesel filling by ID.
  */
 const getDieselFillingById = async (id) => {
   const filling = await DieselFilling.findById(id).populate(
     "filledBy",
     "mobileNumber role profile.name",
   );
-
-  if (!filling) {
-    throw new AppError("Diesel filling not found", 404);
-  }
-
+  if (!filling) throw new AppError("Diesel filling not found", 404);
   return filling;
 };
 
 /**
- * Update diesel filling entry
+ * Update diesel filling entry.
  */
 const updateDieselFilling = async (id, updateData) => {
   const filling = await DieselFilling.findByIdAndUpdate(id, updateData, {
     new: true,
     runValidators: true,
   });
-
-  if (!filling) {
-    throw new AppError("Diesel filling not found", 404);
-  }
-
+  if (!filling) throw new AppError("Diesel filling not found", 404);
   return filling;
 };
 
 /**
- * Delete diesel filling entry
+ * Delete diesel filling entry.
  */
 const deleteDieselFilling = async (id) => {
   const filling = await DieselFilling.findByIdAndDelete(id);
-
-  if (!filling) {
-    throw new AppError("Diesel filling not found", 404);
-  }
-
+  if (!filling) throw new AppError("Diesel filling not found", 404);
   return filling;
 };
 
 /**
- * Generate diesel report with trip analysis
- * Shows each diesel filling along with trips completed since last filling
+ * Generate diesel report with trip analysis.
  */
 const generateDieselReport = async (page = 1, limit = 20, filters = {}) => {
   const query = {};
@@ -214,10 +217,8 @@ const generateDieselReport = async (page = 1, limit = 20, filters = {}) => {
     .limit(limit)
     .lean();
 
-  // For each filling, fetch related receipts (trips)
   const reportData = await Promise.all(
     fillings.map(async (filling) => {
-      // Find receipts for this tanker up to the current filling date
       const requests = await Request.find({
         "tankerAssignment.tankerNumber": filling.tankerNumber,
         status: "completed",
@@ -226,7 +227,7 @@ const generateDieselReport = async (page = 1, limit = 20, filters = {}) => {
           $lte: filling.dateTime,
         },
       })
-        .select("tankerAssignment completedAt societyName address")
+        .select("tankerAssignment completedAt societyName address roundTripKilometer")
         .lean();
 
       return {
@@ -236,6 +237,7 @@ const generateDieselReport = async (page = 1, limit = 20, filters = {}) => {
           societyName: req.societyName,
           address: req.address,
           tankerNumber: req.tankerAssignment?.tankerNumber,
+          roundTripKilometer: req.roundTripKilometer,
         })),
         tripCount: requests.length,
       };
@@ -256,8 +258,8 @@ const generateDieselReport = async (page = 1, limit = 20, filters = {}) => {
 };
 
 /**
- * Get diesel summary for a specific tanker
- * Shows total diesel consumed, total trips, and efficiency metrics
+ * Get diesel summary for a specific tanker.
+ * Includes total km travelled since last fill derived from completed trip roundTripKilometers.
  */
 const getTankerDieselSummary = async (tankerNumber) => {
   const fillings = await DieselFilling.find({ tankerNumber })
@@ -268,14 +270,21 @@ const getTankerDieselSummary = async (tankerNumber) => {
     throw new AppError("No diesel records found for this tanker", 404);
   }
 
-  const totalDieselAmount = fillings.reduce(
-    (sum, f) => sum + f.dieselAmount,
-    0,
-  );
   const totalLiters = fillings.reduce((sum, f) => sum + f.liters, 0);
   const totalTrips = fillings.reduce((sum, f) => sum + f.tripsSinceLastFill, 0);
+  const totalKmTravelled = fillings.reduce(
+    (sum, f) => sum + (f.kilometersTravelledSinceLastTrip || 0),
+    0,
+  );
 
-  // Calculate trips from all completed requests for this tanker
+  // Total km from completed roundTrip records since last filling
+  const lastFilling = fillings[0];
+  const kilometersTravelledSinceLastFill = await sumRoundTripKmBetweenDates(
+    tankerNumber,
+    lastFilling.lastFillingDate || new Date(0),
+    new Date(),
+  );
+
   const totalCompletedTrips = await Request.countDocuments({
     "tankerAssignment.tankerNumber": tankerNumber,
     status: "completed",
@@ -284,27 +293,24 @@ const getTankerDieselSummary = async (tankerNumber) => {
   return {
     tankerNumber,
     totalFillings: fillings.length,
-    totalDieselAmount,
     totalLiters,
     totalTripsRecorded: totalTrips,
     totalCompletedTrips,
+    totalKmTravelled,
+    kilometersTravelledSinceLastFill,
     averageLitersPerTrip:
-      totalTrips > 0 ? (totalLiters / totalTrips).toFixed(2) : 0,
+      totalTrips > 0 ? parseFloat((totalLiters / totalTrips).toFixed(2)) : 0,
     lastFillingDate: fillings[0]?.dateTime || null,
     firstFillingDate: fillings[fillings.length - 1]?.dateTime || null,
   };
 };
 
 /**
- * Mark a diesel filling entry as wrong
- * This will update the status to 'wrong' and record who marked it and when
+ * Mark a diesel filling entry as wrong.
  */
 const markAsWrongEntry = async (id, reason, userId) => {
   const filling = await DieselFilling.findById(id);
-
-  if (!filling) {
-    throw new AppError("Diesel filling not found", 404);
-  }
+  if (!filling) throw new AppError("Diesel filling not found", 404);
 
   if (filling.status === DIESEL_FILLING_STATUS.WRONG) {
     throw new AppError("This entry is already marked as wrong", 400);
@@ -325,13 +331,10 @@ const markAsWrongEntry = async (id, reason, userId) => {
 };
 
 /**
- * Get all wrong entries for super admin
- * Includes pagination and filters
+ * Get all wrong entries for super admin.
  */
 const getWrongEntries = async (page = 1, limit = 20, filters = {}) => {
-  const query = {
-    status: DIESEL_FILLING_STATUS.WRONG,
-  };
+  const query = { status: DIESEL_FILLING_STATUS.WRONG };
 
   if (filters.tankerNumber) {
     query.tankerNumber = filters.tankerNumber;

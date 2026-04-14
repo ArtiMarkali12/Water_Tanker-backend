@@ -22,6 +22,9 @@ const requestRoutes = require("./src/routes/request.routes");
 const queueRoutes = require("./src/routes/queue.routes");
 const receiptRoutes = require("./src/routes/receipt.routes");
 const dieselFillingRoutes = require("./src/routes/dieselFilling.routes");
+const driverRoutes = require("./src/routes/driver.routes");
+const routeRoutes = require("./src/routes/route.routes");
+const attendanceRoutes = require("./src/routes/attendance.routes");
 
 const app = express();
 
@@ -70,6 +73,9 @@ app.use("/api/v1/requests", requestRoutes);
 app.use("/api/v1/queue", queueRoutes);
 app.use("/api/v1/receipts", receiptRoutes);
 app.use("/api/v1/diesel-fillings", dieselFillingRoutes);
+app.use("/api/v1/drivers", driverRoutes);
+app.use("/api/v1/routes", routeRoutes);
+app.use("/api/v1/attendance", attendanceRoutes);
 
 // ── 404 Handler ───────────────────────────────────────────────────────────────
 app.use(notFoundHandler);

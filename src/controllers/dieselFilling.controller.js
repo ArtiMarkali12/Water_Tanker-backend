@@ -15,8 +15,8 @@ const recordDieselFilling = async (req, res, next) => {
     const fillingData = {
       tankerNumber: req.body.tankerNumber,
       dateTime: req.body.dateTime || new Date(),
-      dieselAmount: req.body.dieselAmount,
       liters: req.body.liters,
+      kilometersTravelledSinceLastTrip: req.body.kilometersTravelledSinceLastTrip,
     };
 
     const newFilling = await dieselFillingService.recordDieselFilling(
@@ -97,9 +97,9 @@ const updateDieselFilling = async (req, res, next) => {
 
     if (req.body.tankerNumber) updateData.tankerNumber = req.body.tankerNumber;
     if (req.body.dateTime) updateData.dateTime = req.body.dateTime;
-    if (req.body.dieselAmount !== undefined)
-      updateData.dieselAmount = req.body.dieselAmount;
     if (req.body.liters !== undefined) updateData.liters = req.body.liters;
+    if (req.body.kilometersTravelledSinceLastTrip !== undefined)
+      updateData.kilometersTravelledSinceLastTrip = req.body.kilometersTravelledSinceLastTrip;
 
     const updatedFilling = await dieselFillingService.updateDieselFilling(
       req.params.id,

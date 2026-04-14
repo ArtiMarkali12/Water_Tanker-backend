@@ -12,12 +12,14 @@ const {
   assignTanker,
   completeRequest,
   getManagerReport,
+  assignSourceDestination,
 } = require("../controllers/queue.controller");
 const {
   assignTankerValidator,
   completeRequestValidator,
   paginationValidator,
   managerReportValidator,
+  assignSourceDestinationValidator,
 } = require("../validators/request.validator");
 
 // All queue routes are manager and superAdmin-only
@@ -26,6 +28,12 @@ router.use(protect, authorize(ROLES.MANAGER, ROLES.SUPER_ADMIN));
 router.get("/", paginationValidator, validate, getQueue);
 router.get("/next", peekNext);
 router.patch("/:id/assign", assignTankerValidator, validate, assignTanker);
+router.patch(
+  "/:id/assign-source-destination",
+  assignSourceDestinationValidator,
+  validate,
+  assignSourceDestination,
+);
 router.patch(
   "/:id/complete",
   completeRequestValidator,

@@ -46,6 +46,12 @@ const requestSchema = new mongoose.Schema(
       default: null,
     },
 
+    // Source-destination assignment (set via assign-source-destination endpoint)
+    source: { type: String, trim: true, default: "" },
+    destination: { type: String, trim: true, default: "" },
+    kilometer: { type: Number, default: null },
+    roundTripKilometer: { type: Number, default: null },
+
     completedAt: { type: Date, default: null },
     cancelledAt: { type: Date, default: null },
     cancelReason: { type: String, default: "" },
@@ -60,5 +66,7 @@ const requestSchema = new mongoose.Schema(
 requestSchema.index({ status: 1, queuePosition: 1 });
 requestSchema.index({ userId: 1, status: 1 });
 requestSchema.index({ queuePosition: 1 });
+requestSchema.index({ "tankerAssignment.driverName": 1 });
+requestSchema.index({ "tankerAssignment.tankerNumber": 1 });
 
 module.exports = mongoose.model("Request", requestSchema);

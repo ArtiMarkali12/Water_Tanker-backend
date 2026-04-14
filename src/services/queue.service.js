@@ -169,6 +169,27 @@ const getManagerReport = async ({
   };
 };
 
+/**
+ * Assigns source, destination, and kilometer details to a request.
+ * Calculates roundTripKilometer = kilometers * 2.
+ */
+const assignSourceDestination = async ({ requestId, source, destination, kilometers }) => {
+  const updated = await Request.findByIdAndUpdate(
+    requestId,
+    {
+      $set: {
+        source,
+        destination,
+        kilometer: kilometers,
+        roundTripKilometer: kilometers * 2,
+      },
+    },
+    { new: true, runValidators: true },
+  ).populate("userId", "mobileNumber profile");
+
+  return updated; // null if not found
+};
+
 module.exports = {
   getNextQueuePosition,
   getPendingQueue,
@@ -176,4 +197,5 @@ module.exports = {
   assignTanker,
   completeRequest,
   getManagerReport,
+  assignSourceDestination,
 };

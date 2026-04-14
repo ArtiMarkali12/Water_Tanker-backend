@@ -13,15 +13,15 @@ const dieselFillingSchema = new mongoose.Schema(
       type: Date,
       required: [true, "Date and time is required"],
     },
-    dieselAmount: {
-      type: Number,
-      required: [true, "Diesel amount is required"],
-      min: [0, "Diesel amount cannot be negative"],
-    },
     liters: {
       type: Number,
       required: [true, "Liters is required"],
       min: [0, "Liters cannot be negative"],
+    },
+    kilometersTravelledSinceLastTrip: {
+      type: Number,
+      required: [true, "Kilometers travelled since last trip is required"],
+      min: [0, "Kilometers cannot be negative"],
     },
     filledBy: {
       type: mongoose.Schema.Types.ObjectId,

@@ -21,8 +21,9 @@ const assignTankerValidator = [
     .withMessage("Tanker number must not exceed 20 characters."),
 
   body("driverName")
-    .optional()
     .trim()
+    .notEmpty()
+    .withMessage("Driver name is required.")
     .isLength({ max: 100 })
     .withMessage("Driver name must not exceed 100 characters."),
 
@@ -82,6 +83,30 @@ const managerReportValidator = [
     .withMessage("End date must be in ISO 8601 format (e.g., 2024-01-31)."),
 ];
 
+const assignSourceDestinationValidator = [
+  param("id").isMongoId().withMessage("Invalid request ID."),
+
+  body("source")
+    .trim()
+    .notEmpty()
+    .withMessage("Source is required.")
+    .isLength({ max: 200 })
+    .withMessage("Source cannot exceed 200 characters."),
+
+  body("destination")
+    .trim()
+    .notEmpty()
+    .withMessage("Destination is required.")
+    .isLength({ max: 200 })
+    .withMessage("Destination cannot exceed 200 characters."),
+
+  body("kilometers")
+    .notEmpty()
+    .withMessage("Kilometers is required.")
+    .isFloat({ min: 0 })
+    .withMessage("Kilometers must be a non-negative number."),
+];
+
 module.exports = {
   submitRequestValidator,
   assignTankerValidator,
@@ -89,4 +114,5 @@ module.exports = {
   cancelRequestValidator,
   paginationValidator,
   managerReportValidator,
+  assignSourceDestinationValidator,
 };
